@@ -64,6 +64,9 @@ public:
     template <std::size_t... Indices>
     const T& at() const noexcept;
 
+    T* data_ptr() noexcept { return data.data(); }
+    const T* data_ptr() const noexcept { return data.data(); }
+
 /* Routines */
 private:
     template <std::size_t N>
