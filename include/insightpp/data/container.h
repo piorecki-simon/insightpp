@@ -8,6 +8,35 @@
 namespace inpp {
 namespace data {
 
+template <class T>
+class AlignedAllocator {
+public:
+    using value_type = T;
+
+    AlignedAllocator() = default;
+
+    template <class U>
+    explicit constexpr AlignedAllocator(const AlignedAllocator<U>&) noexcept {}
+
+    [[nodiscard]] T* allocate(const std::size_t n)
+    {
+        const auto bytes = sizeof(T) * n;
+        void* ptr = operator new(bytes, std::align_val_t{32});
+        return static_cast<T*>(ptr);
+    }
+
+    void deallocate(T* p, const std::size_t n)
+    {
+        operator delete(p, std::align_val_t{32});
+    }
+};
+
+template<class T, class U>
+bool operator==(const AlignedAllocator<T>&, const AlignedAllocator<U>&) { return true; }
+
+template<class T, class U>
+bool operator!=(const AlignedAllocator<T>&, const AlignedAllocator<U>&) { return false; }
+
 template <typename T>
 concept TensorConcept =
 requires
@@ -83,7 +112,7 @@ public:
 
 /* Member */
 private:
-    std::vector<T> data;
+    std::vector<T, AlignedAllocator<T>> data;
 };
 
 template <typename T, std::size_t... Dims>
