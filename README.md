@@ -15,25 +15,28 @@ on the MNIST dataset.
 ## Dependencies
 
 - OpenMP
+- OpenBLAS
+- libtorch
 
 ### Currently implemented
 
 - Simple SGD
 - ReLU
 - MSE
+- OpenBLAS choice
 
 ### Missing basics
 
 - Quick start "How to"
 - Unit tests
 - Documentation
+- Comparison between PyTorch (Python), libtorch and insightpp
 
 ### Planned features
 
 - Adam
-- Advanced memory management (alignment etc.)
+- Advanced memory management (alignment etc.) \[in progress\]
 - Advanced kernels for GEMM and other computations
-- OpenBLAS choice
 - He initialization
 
 ### Much later planned features
@@ -42,3 +45,4 @@ on the MNIST dataset.
 - Transformer
 - Diffusion
 - Autograd
+- Data loading
