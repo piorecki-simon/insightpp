@@ -28,8 +28,8 @@ public:
     T w_access(std::size_t idx) const noexcept { return w[idx]; }
     T forward_in_access(std::size_t idx) const noexcept { return forward_in[idx]; }
 
-    const data::Tensor<T, batch_size, out_dim>& forward(const data::Tensor<T, batch_size, inp_dim>& x) noexcept;
-    const data::Tensor<T, batch_size, inp_dim>& backward(const data::Tensor<T, batch_size, out_dim>& d_z) noexcept;
+    const std::unique_ptr<data::Tensor<T, batch_size, out_dim>>& forward(const data::Tensor<T, batch_size, inp_dim>& x) noexcept;
+    const std::unique_ptr<data::Tensor<T, batch_size, inp_dim>>& backward(const data::Tensor<T, batch_size, out_dim>& d_z) noexcept;
     void update() noexcept;
 
 /* Routines */
@@ -44,27 +44,27 @@ private:
 /* Private member */
 private:
 
-    WeightTensor w = InitPolicy::template create<WeightTensor>();
-    WeightTensor w_grad = data::Tensor<T, inp_dim, out_dim>::zeros();
-    BiasTensor b = InitPolicy::template create<BiasTensor>();
-    BiasTensor b_grad = data::Tensor<T, out_dim>::zeros();
-    data::Tensor<T, batch_size, out_dim> forward_out = data::Tensor<T, batch_size, out_dim>::zeros();
-    data::Tensor<T, batch_size, inp_dim> forward_in = data::Tensor<T, batch_size, inp_dim>::zeros();
-    data::Tensor<T, batch_size, inp_dim> backward_out = data::Tensor<T, batch_size, inp_dim>::zeros();
+    std::unique_ptr<WeightTensor> w = std::make_unique<WeightTensor>(InitPolicy::template create<WeightTensor>());
+    std::unique_ptr<WeightTensor> w_grad = std::make_unique<WeightTensor>(data::Tensor<T, inp_dim, out_dim>::zeros());
+    std::unique_ptr<BiasTensor> b = std::make_unique<BiasTensor>(InitPolicy::template create<BiasTensor>());
+    std::unique_ptr<BiasTensor> b_grad = std::make_unique<BiasTensor>(data::Tensor<T, out_dim>::zeros());
+    std::unique_ptr<data::Tensor<T, batch_size, out_dim>> forward_out = std::make_unique<data::Tensor<T, batch_size, out_dim>>(data::Tensor<T, batch_size, out_dim>::zeros());
+    const data::Tensor<T, batch_size, inp_dim>* forward_in = nullptr;
+    std::unique_ptr<data::Tensor<T, batch_size, inp_dim>> backward_out = std::make_unique<data::Tensor<T, batch_size, inp_dim>>(data::Tensor<T, batch_size, inp_dim>::zeros());
 
     const T learning_rate;
 };
 
 template <typename T, std::size_t batch_size, std::size_t inp_dim, std::size_t out_dim, typename InitPolicy>
 requires std::floating_point<T>
-const data::Tensor<T, batch_size, out_dim>& Linear<T, batch_size, inp_dim, out_dim, InitPolicy>::forward(const data::Tensor<T, batch_size, inp_dim>& x) noexcept
+const std::unique_ptr<data::Tensor<T, batch_size, out_dim>>& Linear<T, batch_size, inp_dim, out_dim, InitPolicy>::forward(const data::Tensor<T, batch_size, inp_dim>& x) noexcept
 {
-    forward_in = x;
+    forward_in = &x;
 
-    T* __restrict__ fwd_out_ptr = forward_out.data_ptr();
-    const T* __restrict__ fwd_in_ptr = forward_in.data_ptr();
-    const T* __restrict__ w_ptr = w.data_ptr();
-    const T* __restrict__ b_ptr = b.data_ptr();
+    T* __restrict__ fwd_out_ptr = (*forward_out).data_ptr();
+    const T* __restrict__ fwd_in_ptr = (*forward_in).data_ptr();
+    const T* __restrict__ w_ptr = (*w).data_ptr();
+    const T* __restrict__ b_ptr = (*b).data_ptr();
 
     math::batched_mat_vec_mul_w_bias_kernel<T, batch_size, out_dim, inp_dim>(fwd_out_ptr, fwd_in_ptr, w_ptr, b_ptr);
 
@@ -73,18 +73,18 @@ const data::Tensor<T, batch_size, out_dim>& Linear<T, batch_size, inp_dim, out_d
 
 template <typename T, std::size_t batch_size, std::size_t inp_dim, std::size_t out_dim, typename InitPolicy>
 requires std::floating_point<T>
-const data::Tensor<T, batch_size, inp_dim>& Linear<T, batch_size, inp_dim, out_dim, InitPolicy>::backward(const data::Tensor<T, batch_size, out_dim>& d_z) noexcept
+const std::unique_ptr<data::Tensor<T, batch_size, inp_dim>>& Linear<T, batch_size, inp_dim, out_dim, InitPolicy>::backward(const data::Tensor<T, batch_size, out_dim>& d_z) noexcept
 {
-    T* __restrict__ w_grad_ptr = w_grad.data_ptr();
-    const T* __restrict__ fwd_in_ptr = forward_in.data_ptr();
+    T* __restrict__ w_grad_ptr = (*w_grad).data_ptr();
+    const T* __restrict__ fwd_in_ptr = (*forward_in).data_ptr();
     const T* __restrict__ d_z_ptr = d_z.data_ptr();
     backward_weight_grad_kernel(w_grad_ptr, fwd_in_ptr, d_z_ptr);
 
-    T* __restrict__ b_grad_ptr = b_grad.data_ptr();
+    T* __restrict__ b_grad_ptr = (*b_grad).data_ptr();
     backward_bias_grad_kernel(b_grad_ptr, d_z_ptr);
 
-    T* __restrict__ bwd_out_ptr = backward_out.data_ptr();
-    const T* __restrict w_ptr = w.data_ptr();
+    T* __restrict__ bwd_out_ptr = (*backward_out).data_ptr();
+    const T* __restrict__ w_ptr = (*w).data_ptr();
     backward_out_kernel(bwd_out_ptr, w_ptr, d_z_ptr);
 
     return backward_out;
@@ -94,6 +94,8 @@ template <typename T, std::size_t batch_size, std::size_t inp_dim, std::size_t o
 requires std::floating_point<T>
 void Linear<T, batch_size, inp_dim, out_dim, InitPolicy>::backward_weight_grad_kernel(T* __restrict__ w_grad_ptr, const T* __restrict__ fwd_in_ptr, const T* __restrict__ d_z_ptr) noexcept
 {
+
+#ifndef USE_OPENBLAS
     constexpr auto n = inp_dim * out_dim;
     for (std::size_t i = 0; i < n; ++i) {
         w_grad_ptr[i] = static_cast<T>(0.0);
@@ -131,12 +133,34 @@ void Linear<T, batch_size, inp_dim, out_dim, InitPolicy>::backward_weight_grad_k
             }
         }
     }
+
+#else
+    cblas_sgemm(
+            CblasRowMajor,
+            CblasTrans,
+            CblasNoTrans,
+            inp_dim,
+            out_dim,
+            batch_size,
+            1.0f,
+            fwd_in_ptr,
+            inp_dim,
+            d_z_ptr,
+            out_dim,
+            0.0f,
+            w_grad_ptr,
+            out_dim
+    );
+#endif
+
 }
 
 template <typename T, std::size_t batch_size, std::size_t inp_dim, std::size_t out_dim, typename InitPolicy>
 requires std::floating_point<T>
 void Linear<T, batch_size, inp_dim, out_dim, InitPolicy>::backward_bias_grad_kernel(T* __restrict__ b_grad_ptr, const T* __restrict__ d_z_ptr) noexcept
 {
+
+#ifndef USE_OPENBLAS
     for (std::size_t i = 0; i < out_dim; ++i) {
         b_grad_ptr[i] = static_cast<T>(0.0);
     }
@@ -148,6 +172,26 @@ void Linear<T, batch_size, inp_dim, out_dim, InitPolicy>::backward_bias_grad_ker
             b_grad_ptr[out_col] += d_z_ptr[d_s1 + out_col];
         }
     }
+
+#else
+    std::vector<float> ones(batch_size, 1.0f);
+
+    cblas_sgemv(
+        CblasRowMajor,
+        CblasTrans,
+        batch_size,
+        out_dim,
+        1.0f,
+        d_z_ptr,
+        out_dim,
+        ones.data(),
+        1,
+        0.0f,
+        b_grad_ptr,
+        1
+    );
+#endif
+
 }
 
 template <typename T, std::size_t batch_size, std::size_t inp_dim, std::size_t out_dim, typename InitPolicy>
@@ -155,6 +199,7 @@ requires std::floating_point<T>
 void Linear<T, batch_size, inp_dim, out_dim, InitPolicy>::backward_out_kernel(T* __restrict__ bwd_out_ptr, const T* __restrict__ w_ptr, const T* __restrict__ d_z_ptr) noexcept
 {
 
+#ifndef USE_OPENBLAS
     if constexpr (batch_size > 64) {
 
         #pragma omp parallel for num_threads(4)
@@ -191,16 +236,37 @@ void Linear<T, batch_size, inp_dim, out_dim, InitPolicy>::backward_out_kernel(T*
             }
         }
     }
+
+#else
+    cblas_sgemm(
+    CblasRowMajor,
+    CblasNoTrans,   // dZ
+    CblasTrans,     // W^T
+    batch_size,     // M
+    inp_dim,        // N
+    out_dim,        // K
+    1.0f,
+    d_z_ptr,
+    out_dim,
+    w_ptr,
+    out_dim,
+    0.0f,
+    bwd_out_ptr,
+    inp_dim
+);
+
+#endif
+
 }
 
 template <typename T, std::size_t batch_size, std::size_t inp_dim, std::size_t out_dim, typename InitPolicy>
 requires std::floating_point<T>
 void Linear<T, batch_size, inp_dim, out_dim, InitPolicy>::update() noexcept
 {
-    T* __restrict__ w_ptr = w.data_ptr();
-    const T* __restrict__ w_grad_ptr = w_grad.data_ptr();
-    T* __restrict__ b_ptr = b.data_ptr();
-    const T* __restrict__ b_grad_ptr = b_grad.data_ptr();
+    T* __restrict__ w_ptr = (*w).data_ptr();
+    const T* __restrict__ w_grad_ptr = (*w_grad).data_ptr();
+    T* __restrict__ b_ptr = (*b).data_ptr();
+    const T* __restrict__ b_grad_ptr = (*b_grad).data_ptr();
 
     update_weights_kernel(w_ptr, w_grad_ptr, learning_rate);
     update_bias_kernel(b_ptr, b_grad_ptr, learning_rate);
@@ -211,18 +277,49 @@ requires std::floating_point<T>
 void Linear<T, batch_size, inp_dim, out_dim, InitPolicy>::update_weights_kernel(T* __restrict__ w_ptr, const T* __restrict__ w_grad_ptr, T learning_rate) noexcept
 {
     constexpr auto n = inp_dim * out_dim;
+
+#ifndef USE_OPENBLAS
     for (std::size_t i = 0; i < n; ++i) {
         w_ptr[i] -= learning_rate * w_grad_ptr[i];
     }
+
+#else
+    cblas_saxpy(
+    n,
+    -learning_rate,
+    w_grad_ptr,
+    1,
+    w_ptr,
+    1
+    );
+
+#endif
+
 }
 
 template <typename T, std::size_t batch_size, std::size_t inp_dim, std::size_t out_dim, typename InitPolicy>
 requires std::floating_point<T>
 void Linear<T, batch_size, inp_dim, out_dim, InitPolicy>::update_bias_kernel(T* __restrict__ b_ptr, const T* __restrict__ b_grad_ptr, T learning_rate) noexcept
 {
+
+#ifndef USE_OPENBLAS
     for (std::size_t i = 0; i < out_dim; ++i) {
         b_ptr[i] -= learning_rate * b_grad_ptr[i];
     }
+
+#else
+
+    cblas_saxpy(
+    out_dim,
+    -learning_rate,
+    b_grad_ptr,
+    1,
+    b_ptr,
+    1
+);
+
+#endif
+
 }
 
 } // namespace nn
