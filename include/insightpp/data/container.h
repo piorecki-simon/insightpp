@@ -21,13 +21,13 @@ public:
     [[nodiscard]] T* allocate(const std::size_t n)
     {
         const auto bytes = sizeof(T) * n;
-        void* ptr = operator new(bytes, std::align_val_t{32}); // TODO: change to dynamic alignment value
+        void* ptr = operator new(bytes, std::align_val_t{32});
         return static_cast<T*>(ptr);
     }
 
     void deallocate(T* p, const std::size_t n)
     {
-        operator delete(p, std::align_val_t{32}); // TODO: change to dynamic alignment value
+        operator delete(p, std::align_val_t{32});
     }
 };
 
