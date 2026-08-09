@@ -127,7 +127,7 @@ template <typename T, std::size_t batch_size, std::size_t Rows_m>
 requires std::floating_point<T>
 void MSE<T, batch_size, Rows_m>::backward_kernel(T* __restrict__ grad_ptr, const T* __restrict__ lbl_ptr, const T* __restrict__ pred_ptr) noexcept
 {
-    constexpr T scale = static_cast<T>(2.0) / static_cast<T>(Rows_m * batch_size);
+    constexpr T scale = T(2.0) / T(Rows_m * batch_size);
     constexpr auto n = batch_size * Rows_m;
 
     for (std::size_t i = 0; i < n; ++i) {

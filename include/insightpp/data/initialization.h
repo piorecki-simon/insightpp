@@ -44,7 +44,7 @@ data::Tensor<T, batch_size> is_correct_label(const data::Tensor<T, batch_size, R
     auto out = data::Tensor<T, batch_size>::zeros();
 
     for (std::size_t b_idx = 0; b_idx < batch_size; ++b_idx) {
-        T max_val = static_cast<T>(-1000000.0);
+        T max_val = T(-1000000.0);
         std::size_t max_idx = 0;
         for (std::size_t row = 0; row < Rows_m; ++row) {
             if (prediction(b_idx, row) > max_val) {
@@ -53,8 +53,8 @@ data::Tensor<T, batch_size> is_correct_label(const data::Tensor<T, batch_size, R
             }
         }
 
-        if (label(b_idx, max_idx) == static_cast<T>(1.0)) {
-            out(b_idx) = static_cast<T>(1.0);
+        if (label(b_idx, max_idx) == T(1.0)) {
+            out(b_idx) = T(1.0);
         }
     }
 

@@ -95,10 +95,10 @@ requires std::floating_point<T>
 void Linear<T, batch_size, inp_dim, out_dim, InitPolicy>::backward_weight_grad_kernel(T* __restrict__ w_grad_ptr, const T* __restrict__ fwd_in_ptr, const T* __restrict__ d_z_ptr) noexcept
 {
 
-#ifndef USE_OPENBLAS
+#ifndef USE_MKL_BLAS
     constexpr auto n = inp_dim * out_dim;
     for (std::size_t i = 0; i < n; ++i) {
-        w_grad_ptr[i] = static_cast<T>(0.0);
+        w_grad_ptr[i] = T(0.0);
     }
 
     if constexpr (batch_size > 64) {
@@ -142,12 +142,12 @@ void Linear<T, batch_size, inp_dim, out_dim, InitPolicy>::backward_weight_grad_k
             inp_dim,
             out_dim,
             batch_size,
-            1.0f,
+            T(1.0),
             fwd_in_ptr,
             inp_dim,
             d_z_ptr,
             out_dim,
-            0.0f,
+            T(0.0),
             w_grad_ptr,
             out_dim
     );
@@ -160,9 +160,9 @@ requires std::floating_point<T>
 void Linear<T, batch_size, inp_dim, out_dim, InitPolicy>::backward_bias_grad_kernel(T* __restrict__ b_grad_ptr, const T* __restrict__ d_z_ptr) noexcept
 {
 
-#ifndef USE_OPENBLAS
+#ifndef USE_MKL_BLAS
     for (std::size_t i = 0; i < out_dim; ++i) {
-        b_grad_ptr[i] = static_cast<T>(0.0);
+        b_grad_ptr[i] = T(0.0);
     }
 
     for (std::size_t b_idx = 0; b_idx < batch_size; ++b_idx) {
@@ -174,19 +174,19 @@ void Linear<T, batch_size, inp_dim, out_dim, InitPolicy>::backward_bias_grad_ker
     }
 
 #else
-    std::vector<float> ones(batch_size, 1.0f);
+    static const std::vector<T> ones(batch_size, T(1.0));
 
     cblas_sgemv(
         CblasRowMajor,
         CblasTrans,
         batch_size,
         out_dim,
-        1.0f,
+        T(1.0),
         d_z_ptr,
         out_dim,
         ones.data(),
         1,
-        0.0f,
+        T(0.0),
         b_grad_ptr,
         1
     );
@@ -199,7 +199,7 @@ requires std::floating_point<T>
 void Linear<T, batch_size, inp_dim, out_dim, InitPolicy>::backward_out_kernel(T* __restrict__ bwd_out_ptr, const T* __restrict__ w_ptr, const T* __restrict__ d_z_ptr) noexcept
 {
 
-#ifndef USE_OPENBLAS
+#ifndef USE_MKL_BLAS
     if constexpr (batch_size > 64) {
 
         #pragma omp parallel for num_threads(4)
@@ -208,7 +208,7 @@ void Linear<T, batch_size, inp_dim, out_dim, InitPolicy>::backward_out_kernel(T*
             const std::size_t b_s1 = data::Tensor<T, batch_size, inp_dim>::strides[0] * b_idx;
 
             for (std::size_t inp_col = 0; inp_col < inp_dim; ++inp_col) {
-                T sum = static_cast<T>(0.0);
+                T sum = T(0.0);
 
                 const std::size_t w_s1 = data::Tensor<T, inp_dim, out_dim>::strides[0] * inp_col;
                 for (std::size_t out_col = 0; out_col < out_dim; ++out_col) {
@@ -225,7 +225,7 @@ void Linear<T, batch_size, inp_dim, out_dim, InitPolicy>::backward_out_kernel(T*
             const std::size_t b_s1 = data::Tensor<T, batch_size, inp_dim>::strides[0] * b_idx;
 
             for (std::size_t inp_col = 0; inp_col < inp_dim; ++inp_col) {
-                T sum = static_cast<T>(0.0);
+                T sum = T(0.0);
 
                 const std::size_t w_s1 = data::Tensor<T, inp_dim, out_dim>::strides[0] * inp_col;
                 for (std::size_t out_col = 0; out_col < out_dim; ++out_col) {
@@ -245,12 +245,12 @@ void Linear<T, batch_size, inp_dim, out_dim, InitPolicy>::backward_out_kernel(T*
     batch_size,     // M
     inp_dim,        // N
     out_dim,        // K
-    1.0f,
+    T(1.0),
     d_z_ptr,
     out_dim,
     w_ptr,
     out_dim,
-    0.0f,
+    T(0.0),
     bwd_out_ptr,
     inp_dim
 );
@@ -278,7 +278,7 @@ void Linear<T, batch_size, inp_dim, out_dim, InitPolicy>::update_weights_kernel(
 {
     constexpr auto n = inp_dim * out_dim;
 
-#ifndef USE_OPENBLAS
+#ifndef USE_MKL_BLAS
     for (std::size_t i = 0; i < n; ++i) {
         w_ptr[i] -= learning_rate * w_grad_ptr[i];
     }
@@ -302,7 +302,7 @@ requires std::floating_point<T>
 void Linear<T, batch_size, inp_dim, out_dim, InitPolicy>::update_bias_kernel(T* __restrict__ b_ptr, const T* __restrict__ b_grad_ptr, T learning_rate) noexcept
 {
 
-#ifndef USE_OPENBLAS
+#ifndef USE_MKL_BLAS
     for (std::size_t i = 0; i < out_dim; ++i) {
         b_ptr[i] -= learning_rate * b_grad_ptr[i];
     }

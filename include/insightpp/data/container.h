@@ -58,9 +58,9 @@ public:
     Tensor() noexcept : data(total_size) {}
     explicit Tensor(T value) noexcept : data(total_size, value) {}
 
-    static Tensor zeros() noexcept { return Tensor(static_cast<T>(0.0)); }
-    static Tensor ones() noexcept { return Tensor(static_cast<T>(1.0)); }
-    static Tensor random(T min = static_cast<T>(-0.01), T max = static_cast<T>(0.01)) noexcept
+    static Tensor zeros() noexcept { return Tensor(T(0.0)); }
+    static Tensor ones() noexcept { return Tensor(T(1.0)); }
+    static Tensor random(T min = T(-0.01), T max = T(0.01)) noexcept
     {
         static std::random_device rd;
         static std::mt19937 gen(rd());

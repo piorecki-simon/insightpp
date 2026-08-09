@@ -4,6 +4,7 @@
 #include "../data/container.h"
 
 #include <cblas.h>
+#include <cstring>
 #include <omp.h>
 
 namespace inpp {
@@ -15,7 +16,7 @@ void batched_mat_vec_mul(const data::Tensor<T, B, K>& sample_batch_t, const data
 {
     for (std::size_t b = 0; b < B; ++b) {
         for (std::size_t n = 0; n < N; ++n) {
-            T sum_tmp = static_cast<T>(0.0);
+            T sum_tmp = T(0.0);
             for (std::size_t k = 0; k < K; ++k) {
                 sum_tmp += weight_matrix_t(k, n) * sample_batch_t(b, k);
             }
@@ -29,7 +30,7 @@ requires std::floating_point<T>
 static void batched_mat_vec_mul_w_bias_kernel(T* __restrict__ out_ptr, const T* __restrict__ sample_batch_t_ptr, const T* __restrict__ weight_matrix_t_ptr, const T* __restrict__ bias_ptr) noexcept
 {
 
-#ifndef USE_OPENBLAS
+#ifndef USE_MKL_BLAS
     if constexpr (B > 64) {
 
         #pragma omp parallel for num_threads(4)
@@ -72,7 +73,7 @@ static void batched_mat_vec_mul_w_bias_kernel(T* __restrict__ out_ptr, const T* 
     }
 
 #else
-    for (std::size_t b = 0; b < B; ++b) {
+    /*for (std::size_t b = 0; b < B; ++b) {
         cblas_scopy(
             N,
             bias_ptr,
@@ -80,6 +81,10 @@ static void batched_mat_vec_mul_w_bias_kernel(T* __restrict__ out_ptr, const T* 
             out_ptr + b * N,
             1
         );
+    }*/
+
+    for (std::size_t b = 0; b < B; ++b) {
+        std::memcpy(out_ptr + b * N, bias_ptr, N * sizeof(T));
     }
 
     cblas_sgemm(
@@ -89,12 +94,12 @@ static void batched_mat_vec_mul_w_bias_kernel(T* __restrict__ out_ptr, const T* 
         B,
         N,
         K,
-        1.0f,
+        T(1.0),
         sample_batch_t_ptr,
         K,
         weight_matrix_t_ptr,
         N,
-        1.0f,
+        T(1.0),
         out_ptr,
         N
     );

@@ -4,10 +4,15 @@ project(insightpp LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-option(USE_OPENBLAS "Enable OpenBLAS for GEMMs" OFF)
+# BLAS
+option(USE_MKL_BLAS "Enable Intel MKL BLAS for GEMMs" OFF)
+if(USE_MKL_BLAS)
+    set(BLA_VENDOR Intel10_64lp) # or Intel10_64lp_seq for single-threaded MKL
+endif()
+find_package(BLAS REQUIRED)
+message(STATUS "BLAS libraries: ${BLAS_LIBRARIES}")
 
 find_package(OpenMP REQUIRED)
-find_package(BLAS REQUIRED)
 find_package(Torch REQUIRED)
 
 # Enable testing
@@ -16,13 +21,12 @@ enable_testing()
 #
 # Library
 #
-
 add_library(insightpp
     STATIC
         src/insightpp.cpp
 )
 
-target_link_libraries(insightpp PRIVATE OpenMP::OpenMP_CXX BLAS::BLAS ${TORCH_LIBRARIES})
+target_link_libraries(insightpp PRIVATE OpenMP::OpenMP_CXX BLAS::BLAS)
 
 target_include_directories(insightpp
     PUBLIC
@@ -48,7 +52,6 @@ target_compile_options(insightpp PRIVATE
 #
 # Test executable
 #
-
 add_executable(testinsightpp app/main.cpp)
 
 target_compile_features(testinsightpp
@@ -67,7 +70,6 @@ target_link_libraries(testinsightpp
     PRIVATE
         insightpp
         OpenMP::OpenMP_CXX
-        ${TORCH_LIBRARIES}
 )
 
 add_executable(test_libtorch_insightpp app/libtorch_main_test.cpp)
@@ -91,8 +93,8 @@ target_link_libraries(test_libtorch_insightpp
         ${TORCH_LIBRARIES}
 )
 
-if(USE_OPENBLAS)
-    target_compile_definitions(testinsightpp PRIVATE USE_OPENBLAS)
+if(USE_MKL_BLAS)
+    target_compile_definitions(testinsightpp PRIVATE USE_MKL_BLAS)
 endif()
 
 #
