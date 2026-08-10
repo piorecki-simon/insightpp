@@ -26,7 +26,11 @@ add_library(insightpp
         src/insightpp.cpp
 )
 
-target_link_libraries(insightpp PRIVATE OpenMP::OpenMP_CXX BLAS::BLAS)
+target_link_libraries(insightpp
+    PRIVATE
+        OpenMP::OpenMP_CXX
+        BLAS::BLAS
+)
 
 target_include_directories(insightpp
     PUBLIC
@@ -42,62 +46,19 @@ target_compile_features(insightpp
 )
 
 # Optimization flags
-target_compile_options(insightpp PRIVATE
-    $<$<CONFIG:Release>:-O3>
-    $<$<CONFIG:Release>:-march=native>
-    $<$<CONFIG:Release>:-ffast-math>
-    $<$<CONFIG:Release>:-fopt-info-vec-all>
-)
-
-#
-# Test executable
-#
-add_executable(testinsightpp app/main.cpp)
-
-target_compile_features(testinsightpp
-    PUBLIC
-        cxx_std_20
-)
-
-target_compile_options(testinsightpp PRIVATE
-    $<$<CONFIG:Release>:-O3>
-    $<$<CONFIG:Release>:-march=native>
-    $<$<CONFIG:Release>:-ffast-math>
-    $<$<CONFIG:Release>:-fopt-info-vec-all>
-)
-
-target_link_libraries(testinsightpp
+target_compile_options(insightpp
     PRIVATE
-        insightpp
-        OpenMP::OpenMP_CXX
-)
-
-add_executable(test_libtorch_insightpp app/libtorch_main_test.cpp)
-
-target_compile_features(test_libtorch_insightpp
-        PUBLIC
-        cxx_std_20
-)
-
-target_compile_options(test_libtorch_insightpp PRIVATE
         $<$<CONFIG:Release>:-O3>
         $<$<CONFIG:Release>:-march=native>
         $<$<CONFIG:Release>:-ffast-math>
-        $<$<CONFIG:Release>:-fopt-info-vec-all>
 )
-
-target_link_libraries(test_libtorch_insightpp
-        PRIVATE
-        insightpp
-        OpenMP::OpenMP_CXX
-        ${TORCH_LIBRARIES}
-)
-
-if(USE_MKL_BLAS)
-    target_compile_definitions(testinsightpp PRIVATE USE_MKL_BLAS)
-endif()
 
 #
 # Tests
 #
 add_subdirectory(tests)
+
+#
+# Examples
+#
+add_subdirectory(examples)
