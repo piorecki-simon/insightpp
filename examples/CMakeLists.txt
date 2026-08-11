@@ -35,6 +35,7 @@ target_link_libraries(mnist_sgd_01_libtorch
     PRIVATE
         insightpp
         OpenMP::OpenMP_CXX
+        ${TORCH_LIBRARIES}
 )
 
 if(USE_MKL_BLAS)
