@@ -2,8 +2,6 @@
 
 ---
 
-[TOC]
-
 ## MNIST
 
 ### Dependencies
